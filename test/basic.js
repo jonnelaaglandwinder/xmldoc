@@ -229,6 +229,113 @@ t.test("eachChild with text and comments", function (t) {
   t.end();
 });
 
+for (var method of [
+  "getAttributeNS",
+  "hasAttributeNS",
+  "setAttributeNS",
+  "childNamedNS",
+  "childrenNamedNS",
+  "childWithAttributeNS",
+  "descendantsNamedNS",
+  "descendantWithPathNS",
+  "valueWithPathNS",
+]) {
+  var xmlString =
+    '<books xmlns:ns="http://example.com/books"><ns:book/></books>';
+  var books = new XmlDocument(xmlString);
+
+  t.test(`${method} throws when xmlns is not enabled`, function (t) {
+    t.throws(() => books[method]());
+    t.end();
+  });
+}
+
+t.test("getAttributeNS", function (t) {
+  var xmlString =
+    '<books xmlns:ns="http://example.com/books"><ns:book ns:title="Twilight"/></books>';
+  var books = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var book = books.childNamed("ns:book");
+  t.equal(book.getAttributeNS("http://example.com/books", "title"), "Twilight");
+
+  t.end();
+});
+
+t.test("hasAttributeNS", function (t) {
+  var xmlString =
+    '<books xmlns:ns="http://example.com/books"><ns:book ns:title="Twilight"/></books>';
+  var books = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var book = books.childNamed("ns:book");
+  t.equal(book.hasAttributeNS("http://example.com/books", "title"), true);
+  t.equal(book.hasAttributeNS("http://example.com/books", "author"), false);
+
+  t.end();
+});
+
+t.test("setAttributeNS", function (t) {
+  var xmlString =
+    '<books xmlns:ns="http://example.com/books"><ns:book ns:title="Twilight"/></books>';
+  var books = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var book = books.childNamed("ns:book");
+  book.setAttributeNS("http://example.com/books", "title", "New Moon");
+  book.setAttributeNS("http://example.com/books", "author", "Stephenie Meyer");
+  book.setAttributeNS("http://example.com/non-existent", "attr", "value");
+  t.equal(
+    book.toString(),
+    '<ns:book ns:title="New Moon" ns:author="Stephenie Meyer"/>',
+  );
+
+  t.end();
+});
+
+t.test(
+  "set unnamespaced attribute through accessor with xmlns enabled",
+  function (t) {
+    var xmlString =
+      '<books xmlns:ns="http://example.com/books"><ns:book title="Twilight"/></books>';
+    var books = new XmlDocument(xmlString, {
+      xmlns: true,
+    });
+
+    var book = books.childNamed("ns:book");
+    book.attr.title = "New Moon";
+    book.attr.publicationDate = "2006-08-21";
+    t.equal(
+      book.toString(),
+      '<ns:book title="New Moon" publicationDate="2006-08-21"/>',
+    );
+
+    t.end();
+  },
+);
+
+t.test("set namespaced attribute through accessor", function (t) {
+  var xmlString =
+    '<books xmlns:ns="http://example.com/books"><ns:book ns:title="Twilight"/></books>';
+  var books = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var book = books.childNamed("ns:book");
+  book.attr["non-existent:attr"] = "value";
+  book.attr["ns:title"] = "New Moon";
+  book.attr["ns:publicationDate"] = "2006-08-21";
+  t.equal(
+    book.toString(),
+    '<ns:book ns:title="New Moon" ns:publicationDate="2006-08-21"/>',
+  );
+
+  t.end();
+});
+
 t.test("childNamed", function (t) {
   var xmlString = "<books><book/><good-book/></books>";
   var books = new XmlDocument(xmlString);
@@ -238,6 +345,26 @@ t.test("childNamed", function (t) {
 
   var badBook = books.childNamed("bad-book");
   t.equal(badBook, undefined);
+
+  t.end();
+});
+
+t.test("childNamedNS", function (t) {
+  var xmlString =
+    '<books xmlns:ns="http://example.com/books"><ns:book/><ns:good-book/></books>';
+  var books = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var goodBook = books.childNamedNS("http://example.com/books", "good-book");
+  t.equal(goodBook.name, "ns:good-book");
+  t.equal(goodBook.local, "good-book");
+
+  var badBook = books.childNamedNS("http://example.com/books", "bad-book");
+  t.equal(badBook, undefined);
+
+  var goodBookUnqualified = books.childNamedNS("", "good-book");
+  t.equal(goodBookUnqualified, undefined);
 
   t.end();
 });
@@ -255,7 +382,7 @@ t.test("childNamed with text", function (t) {
   t.end();
 });
 
-t.test("childNamed", function (t) {
+t.test("childrenNamed", function (t) {
   var xmlString =
     '<fruits><apple sweet="yes"/><orange/><apple sweet="no"/><banana/></fruits>';
   var fruits = new XmlDocument(xmlString);
@@ -264,6 +391,22 @@ t.test("childNamed", function (t) {
   t.equal(apples.length, 2);
   t.equal(apples[0].attr.sweet, "yes");
   t.equal(apples[1].attr.sweet, "no");
+  t.end();
+});
+
+t.test("childrenNamedNS", function (t) {
+  var xmlString =
+    '<fruits xmlns:ns="http://example.com/fruits"><ns:apple sweet="yes"/><orange/><ns:apple sweet="no"/><banana/></fruits>';
+  var fruits = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var apples = fruits.childrenNamedNS("http://example.com/fruits", "apple");
+
+  t.equal(apples.length, 2);
+  t.equal(apples[0].attr.sweet, "yes");
+  t.equal(apples[1].attr.sweet, "no");
+
   t.end();
 });
 
@@ -280,6 +423,36 @@ t.test("childWithAttribute", function (t) {
   t.equal(rottenFruit.name, "orange");
 
   var peeled = fruits.childWithAttribute("peeled");
+  t.equal(peeled, undefined);
+
+  t.end();
+});
+
+t.test("childWithAttributeNS", function (t) {
+  var xmlString =
+    '<fruits xmlns:ns="http://example.com/fruits"><ns:apple pick="no"/><orange ns:rotten="yes"/><ns:apple ns:pick="yes"/><banana/></fruits>';
+  var fruits = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var pickedFruit = fruits.childWithAttributeNS(
+    "http://example.com/fruits",
+    "pick",
+    "yes",
+  );
+  t.equal(pickedFruit.name, "ns:apple");
+  t.equal(pickedFruit.attr["ns:pick"], "yes");
+
+  var rottenFruit = fruits.childWithAttributeNS(
+    "http://example.com/fruits",
+    "rotten",
+  );
+  t.equal(rottenFruit.name, "orange");
+
+  var peeled = fruits.childWithAttributeNS(
+    "http://example.com/fruits",
+    "peeled",
+  );
   t.equal(peeled, undefined);
 
   t.end();
@@ -319,6 +492,38 @@ t.test("descendantsNamed", function (t) {
   t.end();
 });
 
+t.test("descendantsNamedNS", function (t) {
+  var xmlString = `
+    <navigation xmlns:ns="http://example.com/navigation">
+      <ns:item id="1"/>
+      <divider/>
+      <ns:item id="2"/>
+      <ns:item id="2.1"/>
+      <ns:item id="2.2"/>
+      <ns:item id="2.2.1"/>
+      <divider/>
+      <ns:item id="3"/>
+    </navigation>
+  `;
+  var navigation = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var items = navigation.descendantsNamedNS(
+    "http://example.com/navigation",
+    "item",
+  );
+
+  t.equal(items.length, 6);
+  t.equal(items[0].attr.id, "1");
+  t.equal(items[1].attr.id, "2");
+  t.equal(items[2].attr.id, "2.1");
+  t.equal(items[3].attr.id, "2.2");
+  t.equal(items[4].attr.id, "2.2.1");
+  t.equal(items[5].attr.id, "3");
+  t.end();
+});
+
 t.test("descendantWithPath", function (t) {
   var xmlString =
     "<book><author><first>George R.R.</first><last>Martin</last></author></book>";
@@ -331,6 +536,34 @@ t.test("descendantWithPath", function (t) {
   t.equal(middleNameNode, undefined);
 
   var publisherNameNode = book.descendantWithPath("publisher.first");
+  t.equal(publisherNameNode, undefined);
+
+  t.end();
+});
+
+t.test("descendantWithPathNS", function (t) {
+  var xmlString =
+    '<book xmlns:ns="http://example.com/book"><ns:author><ns:first>George R.R.</ns:first><ns:last>Martin</ns:last></ns:author></book>';
+  var book = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var lastNameNode = book.descendantWithPathNS(
+    "http://example.com/book",
+    "author.last",
+  );
+  t.equal(lastNameNode.val, "Martin");
+
+  var middleNameNode = book.descendantWithPathNS(
+    "http://example.com/book",
+    "author.middle",
+  );
+  t.equal(middleNameNode, undefined);
+
+  var publisherNameNode = book.descendantWithPathNS(
+    "http://example.com/book",
+    "publisher.first",
+  );
   t.equal(publisherNameNode, undefined);
 
   t.end();
@@ -365,6 +598,31 @@ t.test("valueWithPath", function (t) {
   t.equal(lastNameHyphenated, "no");
 
   var publisherName = book.valueWithPath("publisher.last@hyphenated");
+  t.equal(publisherName, undefined);
+
+  t.end();
+});
+
+t.test("valueWithPathNS", function (t) {
+  var xmlString =
+    '<book xmlns:ns="http://example.com/book"><ns:author><ns:first>George R.R.</ns:first><ns:last ns:hyphenated="no">Martin</ns:last></ns:author></book>';
+  var book = new XmlDocument(xmlString, {
+    xmlns: true,
+  });
+
+  var lastName = book.valueWithPathNS("http://example.com/book", "author.last");
+  t.equal(lastName, "Martin");
+
+  var lastNameHyphenated = book.valueWithPathNS(
+    "http://example.com/book",
+    "author.last@hyphenated",
+  );
+  t.equal(lastNameHyphenated, "no");
+
+  var publisherName = book.valueWithPathNS(
+    "http://example.com/book",
+    "publisher.last@hyphenated",
+  );
   t.equal(publisherName, undefined);
 
   t.end();
@@ -447,6 +705,34 @@ t.test("toString", function (t) {
   xmlString = "<hello>world<earth/><moon/></hello>";
   doc = new XmlDocument(xmlString);
   t.equal(doc.toString({ compressed: true }), xmlString);
+
+  t.end();
+});
+
+t.test(
+  "XmlDocument serializes the same with and without xmlns option",
+  function (t) {
+    var xmlString =
+      '<books xmlns:ns="http://example.com/books"><ns:book ns:title="Twilight"/></books>';
+    var doc1 = new XmlDocument(xmlString);
+    var doc2 = new XmlDocument(xmlString, {
+      xmlns: true,
+    });
+
+    t.equal(JSON.stringify(doc1), JSON.stringify(doc2));
+    t.end();
+  },
+);
+
+t.test("throws when xmlns is used and Proxy is not supported", function (t) {
+  var _Proxy = globalThis.Proxy;
+  globalThis.Proxy = undefined;
+
+  t.throws(() => {
+    new XmlDocument("<hello/>", { xmlns: true });
+  });
+
+  globalThis.Proxy = _Proxy;
 
   t.end();
 });
